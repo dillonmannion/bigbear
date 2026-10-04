@@ -39,8 +39,7 @@ all must pass. Scripts run with `bun`; dependencies are managed with `pnpm`.
   `middleware.ts`; do not add a `middleware.ts`.
 - `prisma/schema.prisma` — 23 models, the DB source of truth. Run `pnpm db:migrate`
   after edits.
-- `tests/` — Vitest suite. `.codesight/CODESIGHT.md` is an AST-derived map; read it
-  to orient, but it can lag the live code — verify counts and symbol names at source.
+- `tests/` — Vitest suite.
 
 Auth is enforced in three layers: `src/proxy.ts` (global) → route-group layout guards
 → `assert*()` guards inside each server action.

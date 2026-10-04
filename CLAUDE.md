@@ -15,14 +15,6 @@ See settings.json for server configuration.
 
 See @AGENTS.md for project context, commands, architecture, constraints, and testing.
 
-## AI Context (codesight)
-
-- Architecture codemap: `.codesight/CODESIGHT.md` (routes, models, components,
-  dependency graph). Read it to orient before exploring source — but it can lag the
-  live code, so verify counts and symbol names against source.
-- Before editing high-impact modules (`src/lib/env.ts`, `src/lib/prisma.ts`,
-  `src/lib/auth.ts`), check their blast radius in CODESIGHT.md first.
-
 ## Nested AGENTS.md
 
 Domain instruction files, imported so they apply when working in their area:
