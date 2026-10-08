@@ -10,7 +10,6 @@ img/
 
 # Local AI/agent tooling — not project state
 .ollama.json
-.opencode.json
 GEMINI.md
 Modelfile
 # dependencies
