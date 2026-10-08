@@ -183,4 +183,6 @@ export const RATE_LIMITS = {
   api: { limit: 100, windowSeconds: 60 },
   /** Availability API: 60 requests per minute */
   availability: { limit: 60, windowSeconds: 60 },
+  /** Family token verification: 5 requests per 15 minutes */
+  familyVerify: { limit: 5, windowSeconds: 15 * 60 },
 } as const
