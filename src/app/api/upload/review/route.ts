@@ -34,6 +34,9 @@ export const POST = async (request: Request): Promise<NextResponse> => {
 
     return NextResponse.json(jsonResponse)
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 400 })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 400 }
+    )
   }
 }

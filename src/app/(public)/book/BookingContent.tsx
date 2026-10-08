@@ -44,6 +44,24 @@ interface GuestInfo {
 //   error?: string
 // }
 
+function computeTotalWithDeposit(
+  checkIn: Date,
+  checkOut: Date,
+  config: PricingConfig,
+  selectedAddons: SelectedAddon[],
+  addons: Addon[]
+): number {
+  const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
+  const accommodationTotal = config.baseNightlyRate * nights
+  const addonsTotal = selectedAddons.reduce((total, selected) => {
+    const addon = addons.find((a) => a.id === selected.id)
+    return total + (addon ? addon.price * selected.quantity : 0)
+  }, 0)
+  const subtotal = accommodationTotal + config.cleaningFee + addonsTotal
+  const deposit = subtotal * (config.depositPercentage / 100)
+  return subtotal + deposit
+}
+
 export const BookingContent = () => {
   const searchParams = useSearchParams()
   const cancelled = searchParams.get('cancelled')
@@ -209,6 +227,11 @@ export const BookingContent = () => {
 
   const config = pricing ?? defaultPricing
 
+  const totalWithDeposit =
+    checkIn && checkOut
+      ? computeTotalWithDeposit(checkIn, checkOut, config, selectedAddons, addons)
+      : null
+
   if (familyConfirmed) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-4">
@@ -344,22 +367,9 @@ export const BookingContent = () => {
       <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-card border-t border-border px-4 py-3 safe-area-pb">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="text-sm">
-            {checkIn && checkOut ? (
+            {totalWithDeposit !== null ? (
               <span className="font-semibold text-foreground">
-                $
-                {(() => {
-                  const nights = Math.ceil(
-                    (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
-                  )
-                  const accommodationTotal = config.baseNightlyRate * nights
-                  const addonsTotal = selectedAddons.reduce((total, selected) => {
-                    const addon = addons.find((a) => a.id === selected.id)
-                    return total + (addon ? addon.price * selected.quantity : 0)
-                  }, 0)
-                  const subtotal = accommodationTotal + config.cleaningFee + addonsTotal
-                  const deposit = subtotal * (config.depositPercentage / 100)
-                  return (subtotal + deposit).toFixed(2)
-                })()}{' '}
+                ${totalWithDeposit.toFixed(2)}{' '}
                 <span className="font-normal text-muted-foreground">total</span>
               </span>
             ) : (
@@ -393,19 +403,7 @@ export const BookingContent = () => {
             guestEmail: guestInfo.email,
             guestPhone: guestInfo.phone,
             addons: selectedAddons,
-            totalAmount: (() => {
-              const nights = Math.ceil(
-                (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
-              )
-              const accommodationTotal = config.baseNightlyRate * nights
-              const addonsTotal = selectedAddons.reduce((total, selected) => {
-                const addon = addons.find((a) => a.id === selected.id)
-                return total + (addon ? addon.price * selected.quantity : 0)
-              }, 0)
-              const subtotal = accommodationTotal + config.cleaningFee + addonsTotal
-              const deposit = subtotal * (config.depositPercentage / 100)
-              return subtotal + deposit
-            })(),
+            totalAmount: totalWithDeposit ?? 0,
           }}
         />
       )}
