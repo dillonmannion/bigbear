@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Star, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
@@ -16,9 +17,9 @@ export interface PublicReview {
 
 interface PublicReviewListProps {
   reviews: PublicReview[]
+  page: number
+  totalPages: number
 }
-
-const PAGE_SIZE = 20
 
 const StarRow = ({ rating }: { rating: number }) => (
   <div className="flex gap-0.5" aria-label={`${String(rating)} out of 5 stars`}>
@@ -35,8 +36,7 @@ const StarRow = ({ rating }: { rating: number }) => (
   </div>
 )
 
-export const PublicReviewList = ({ reviews }: PublicReviewListProps) => {
-  const [page, setPage] = useState(1)
+export const PublicReviewList = ({ reviews, page, totalPages }: PublicReviewListProps) => {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -50,15 +50,12 @@ export const PublicReviewList = ({ reviews }: PublicReviewListProps) => {
     }
   }, [lightboxUrl])
 
-  const totalPages = Math.max(1, Math.ceil(reviews.length / PAGE_SIZE))
-  const pageReviews = reviews.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   return (
     <div className="space-y-6">
-      {pageReviews.map((review) => (
+      {reviews.map((review) => (
         <article key={review.id} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -98,31 +95,35 @@ export const PublicReviewList = ({ reviews }: PublicReviewListProps) => {
 
       {totalPages > 1 && (
         <nav className="flex items-center justify-center gap-4 pt-2" aria-label="Review pages">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page === 1}
-            onClick={() => {
-              setPage((p) => Math.max(1, p - 1))
-            }}
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            Previous
-          </Button>
+          {page > 1 ? (
+            <Link href={page === 2 ? '/reviews' : `/reviews?page=${String(page - 1)}`}>
+              <Button variant="outline" size="sm">
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Previous
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Previous
+            </Button>
+          )}
           <span className="text-sm text-muted-foreground">
             Page {page} of {totalPages}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page === totalPages}
-            onClick={() => {
-              setPage((p) => Math.min(totalPages, p + 1))
-            }}
-          >
-            Next
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
+          {page < totalPages ? (
+            <Link href={`/reviews?page=${String(page + 1)}`}>
+              <Button variant="outline" size="sm">
+                Next
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" disabled>
+              Next
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          )}
         </nav>
       )}
 

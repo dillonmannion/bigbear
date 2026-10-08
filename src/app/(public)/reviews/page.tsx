@@ -2,19 +2,47 @@ import { Star } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { PublicReviewList, type PublicReview } from './PublicReviewList'
 
-// ISR — mutations bust this path immediately via invalidateReviews()
-export const revalidate = 3600
+// Dynamic route — reading searchParams opts out of the Full Route Cache.
+// invalidateReviews() still calls revalidatePath('/reviews') which is fine.
+
+const PAGE_SIZE = 20
 
 export const metadata = {
   title: 'Guest Reviews - Grizzly Getaway',
   description: 'Read what guests say about their stay at Grizzly Getaway.',
 }
 
-export default async function PublicReviewsPage() {
-  const reviews = await prisma.review.findMany({
-    where: { isPublished: true },
-    orderBy: { createdAt: 'desc' },
-  })
+interface PublicReviewsPageProps {
+  searchParams: Promise<{ page?: string }>
+}
+
+export default async function PublicReviewsPage({ searchParams }: PublicReviewsPageProps) {
+  const { page: rawPage } = await searchParams
+  const parsedPage = Number(rawPage)
+  const page = Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1
+
+  const where = { isPublished: true } as const
+
+  const [reviews, aggregation] = await Promise.all([
+    prisma.review.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.review.aggregate({
+      where,
+      _count: true,
+      _avg: { rating: true },
+    }),
+  ])
+
+  const count = aggregation._count
+  const average = aggregation._avg.rating ?? 0
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+
+  // Clamp to valid page range — show empty list on last page if out of bounds
+  const safePage = Math.min(page, totalPages)
 
   const reviewDtos: PublicReview[] = reviews.map((review) => ({
     id: review.id,
@@ -24,9 +52,6 @@ export default async function PublicReviewsPage() {
     photoUrls: review.photoUrls,
     createdAt: review.createdAt.toISOString(),
   }))
-
-  const count = reviewDtos.length
-  const average = count > 0 ? reviewDtos.reduce((sum, review) => sum + review.rating, 0) / count : 0
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -47,7 +72,9 @@ export default async function PublicReviewsPage() {
         )}
       </div>
 
-      {count > 0 && <PublicReviewList reviews={reviewDtos} />}
+      {count > 0 && (
+        <PublicReviewList reviews={reviewDtos} page={safePage} totalPages={totalPages} />
+      )}
     </div>
   )
 }
