@@ -1,18 +1,3 @@
-<!-- autobots:managed:start -->
-
-# CLAUDE.md
-
-Configuration and instructions for Claude Code.
-
-## Rules
-
-## MCP Servers
-
-Configured MCP servers provide access to external tools and data sources.
-See settings.json for server configuration.
-
-<!-- autobots:managed:end -->
-
 See @AGENTS.md for project context, commands, architecture, constraints, and testing.
 
 ## Nested AGENTS.md
