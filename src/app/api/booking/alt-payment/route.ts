@@ -7,6 +7,7 @@ import {
   isDateOverlapError,
   isRangeAvailable,
 } from '@/lib/booking/availability'
+import { validateBookingPolicy } from '@/lib/booking/validation'
 import { HOLD_DURATION_MS, PAYMENT_METHOD_INFO } from '@/lib/payment-methods'
 import { sendHoldCreatedGuest, sendHoldCreatedOwner } from '@/lib/notifications-booking'
 import { invalidateBookings, invalidateCalendar } from '@/lib/cache/invalidation'
@@ -79,42 +80,13 @@ export const POST = async (request: NextRequest): Promise<NextResponse> => {
 
     const checkInDate = new Date(checkIn)
     const checkOutDate = new Date(checkOut)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
 
-    if (checkInDate < today) {
-      return NextResponse.json({ error: 'Check-in date cannot be in the past' }, { status: 400 })
+    const policy = await validateBookingPolicy(checkInDate, checkOutDate)
+    if (!policy.ok) {
+      return NextResponse.json({ error: policy.error }, { status: policy.status })
     }
 
-    if (checkOutDate <= checkInDate) {
-      return NextResponse.json(
-        { error: 'Check-out date must be after check-in date' },
-        { status: 400 }
-      )
-    }
-
-    const pricing = await prisma.pricingConfig.findFirst()
-    if (!pricing) {
-      return NextResponse.json({ error: 'Pricing not configured' }, { status: 500 })
-    }
-
-    const nights = Math.ceil(
-      (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
-    )
-
-    if (nights < pricing.minNights) {
-      return NextResponse.json(
-        { error: `Minimum stay is ${pricing.minNights} nights` },
-        { status: 400 }
-      )
-    }
-
-    if (nights > pricing.maxNights) {
-      return NextResponse.json(
-        { error: `Maximum stay is ${pricing.maxNights} nights` },
-        { status: 400 }
-      )
-    }
+    const { pricing, nights } = policy
 
     // Server-side pricing — never trust client amounts. Addons priced from
     // the DB; unknown addon ids are ignored. Deposit is informational and is

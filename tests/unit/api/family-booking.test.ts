@@ -40,6 +40,16 @@ const futureDate = (daysFromNow: number) => {
   return d.toISOString()
 }
 
+const pricingFixture = {
+  id: 'pricing-1',
+  baseNightlyRate: 250,
+  cleaningFee: 100,
+  depositPercentage: 20,
+  minNights: 2,
+  maxNights: 14,
+  maxGuests: 8,
+} as never
+
 const validBody = () => ({
   token: 'family-token',
   checkIn: futureDate(7),
@@ -87,6 +97,7 @@ describe('POST /api/booking/family', () => {
     mockSendFamilyBookingCreated.mockResolvedValue(undefined)
     setupTransactionPassthrough()
     setupAvailableRange()
+    prismaMock.pricingConfig.findFirst.mockResolvedValue(pricingFixture)
     prismaMock.user.findUnique.mockResolvedValue(familyUser)
     prismaMock.booking.create.mockResolvedValue(
       createBookingFixture({
@@ -215,5 +226,61 @@ describe('POST /api/booking/family', () => {
     const response = await POST(createRequest({ ...validBody(), checkIn: '2020-01-01' }))
 
     expect(response.status).toBe(400)
+  })
+
+  it('returns 400 when stay is shorter than minNights', async () => {
+    const response = await POST(
+      createRequest({ ...validBody(), checkIn: futureDate(7), checkOut: futureDate(8) })
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json.error).toContain('Minimum stay is 2 nights')
+    expect(prismaMock.booking.create).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when stay is longer than maxNights', async () => {
+    const response = await POST(
+      createRequest({ ...validBody(), checkIn: futureDate(7), checkOut: futureDate(30) })
+    )
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json.error).toContain('Maximum stay is 14 nights')
+    expect(prismaMock.booking.create).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 when guest count exceeds maxGuests', async () => {
+    const response = await POST(createRequest({ ...validBody(), numberOfGuests: 12 }))
+    const json = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(json.error).toContain('Maximum 8 guests allowed')
+    expect(prismaMock.booking.create).not.toHaveBeenCalled()
+  })
+
+  it('returns 500 when pricing config is missing', async () => {
+    prismaMock.pricingConfig.findFirst.mockResolvedValue(null)
+
+    const response = await POST(createRequest(validBody()))
+    const json = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(json.error).toContain('Pricing not configured')
+    expect(prismaMock.booking.create).not.toHaveBeenCalled()
+  })
+
+  it('accepts exactly minNights stay', async () => {
+    const response = await POST(
+      createRequest({ ...validBody(), checkIn: futureDate(7), checkOut: futureDate(9) })
+    )
+
+    expect(response.status).toBe(200)
+  })
+
+  it('accepts exactly maxGuests count', async () => {
+    const response = await POST(createRequest({ ...validBody(), numberOfGuests: 8 }))
+
+    expect(response.status).toBe(200)
   })
 })

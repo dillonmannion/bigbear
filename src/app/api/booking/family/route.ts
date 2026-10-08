@@ -7,6 +7,7 @@ import {
   isDateOverlapError,
   isRangeAvailable,
 } from '@/lib/booking/availability'
+import { validateBookingPolicy } from '@/lib/booking/validation'
 import { sendFamilyBookingCreated } from '@/lib/notifications-booking'
 import { invalidateBookings, invalidateCalendar } from '@/lib/cache/invalidation'
 
@@ -57,17 +58,10 @@ export async function POST(req: NextRequest) {
 
     const checkInDate = new Date(checkIn)
     const checkOutDate = new Date(checkOut)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
 
-    if (checkInDate < today) {
-      return NextResponse.json({ error: 'Check-in date cannot be in the past' }, { status: 400 })
-    }
-    if (checkOutDate <= checkInDate) {
-      return NextResponse.json(
-        { error: 'Check-out date must be after check-in date' },
-        { status: 400 }
-      )
+    const policy = await validateBookingPolicy(checkInDate, checkOutDate, numberOfGuests)
+    if (!policy.ok) {
+      return NextResponse.json({ error: policy.error }, { status: policy.status })
     }
 
     // Create booking — family bookings are auto-confirmed with $0 amounts.
