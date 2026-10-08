@@ -7,10 +7,9 @@ import { verifyReviewToken } from '@/lib/review-token'
 import { signReviewToken } from '@/lib/review-token'
 import { invalidateReviews } from '@/lib/cache/invalidation'
 import { deleteBlob } from '@/lib/blob'
-import { Resend } from 'resend'
+import { getResend } from '@/lib/resend'
+import { escapeHtml } from '@/lib/security'
 import { env } from '@/lib/env'
-
-const resend = new Resend(env().AUTH_RESEND_KEY)
 
 // ---------------------------------------------------------------------------
 // Guest: submit a review (unauthenticated, token-gated)
@@ -152,13 +151,16 @@ export const sendReviewInvite = secureAction(
       year: 'numeric',
     })
 
-    await resend.emails.send({
-      from: env().RESEND_FROM_EMAIL,
-      to: booking.guestEmail,
-      subject: 'How was your stay? Leave a review - Grizzly Getaway',
-      html: `
+    const safeGuestName = escapeHtml(booking.guestName)
+
+    void getResend()
+      .emails.send({
+        from: env().RESEND_FROM_EMAIL,
+        to: booking.guestEmail,
+        subject: 'How was your stay? Leave a review - Grizzly Getaway',
+        html: `
         <h2>We hope you loved your stay!</h2>
-        <p>Hello ${booking.guestName},</p>
+        <p>Hello ${safeGuestName},</p>
         <p>Thank you for staying with us at Grizzly Getaway (${checkInDate} - ${checkOutDate}).
         We'd love to hear about your experience!</p>
         <p><a href="${reviewUrl}" style="display:inline-block; padding:12px 24px; background-color:#447a52; color:white; text-decoration:none; border-radius:8px; font-weight:bold;">
@@ -168,7 +170,10 @@ export const sendReviewInvite = secureAction(
         <p style="color:#666; font-size:12px;">This link expires in 14 days.</p>
         <p>Best regards,<br>Grizzly Getaway</p>
       `,
-    })
+      })
+      .catch(() => {
+        // Non-blocking — review-invite email failure should not surface to the owner
+      })
 
     return { success: true }
   }

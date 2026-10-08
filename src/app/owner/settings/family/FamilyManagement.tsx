@@ -40,7 +40,13 @@ export const FamilyManagement = ({ initialMembers }: FamilyManagementProps) => {
         setName('')
         setEmail('')
         setShowAddForm(false)
-        setSuccessMsg(`Invite sent to ${email.trim()}`)
+        if (result.data?.emailSent === false) {
+          setSuccessMsg(
+            'Family member added, but the invite email could not be sent. Try resending.'
+          )
+        } else {
+          setSuccessMsg(`Invite sent to ${email.trim()}`)
+        }
         // Refresh will pick up the new member if they already had an account
         window.location.reload()
       } else {
@@ -67,7 +73,11 @@ export const FamilyManagement = ({ initialMembers }: FamilyManagementProps) => {
     startTransition(async () => {
       const result = await resendFamilyInvite({ userId })
       if (result.success) {
-        setSuccessMsg('Booking invite resent!')
+        if (result.data?.emailSent === false) {
+          setError('Could not send the invite email. Please try again later.')
+        } else {
+          setSuccessMsg('Booking invite resent!')
+        }
       }
       setActionId(null)
     })

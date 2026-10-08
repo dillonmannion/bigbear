@@ -1,6 +1,8 @@
 import { vi } from 'vitest'
 
-export const mockSend = vi.fn().mockResolvedValue({ id: 'mock-email-id' })
+// Matches the real SDK contract: API failures resolve as { data: null, error },
+// only network errors reject.
+export const mockSend = vi.fn().mockResolvedValue({ data: { id: 'mock-email-id' }, error: null })
 
 export class MockResend {
   emails = { send: mockSend }
@@ -8,7 +10,7 @@ export class MockResend {
 
 export const resetResendMocks = () => {
   mockSend.mockReset()
-  mockSend.mockResolvedValue({ id: 'mock-email-id' })
+  mockSend.mockResolvedValue({ data: { id: 'mock-email-id' }, error: null })
 }
 
 // Named export for vi.mock

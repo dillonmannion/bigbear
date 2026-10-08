@@ -72,6 +72,7 @@ describe('Family Actions', () => {
       })
 
       expect(result.success).toBe(true)
+      expect(result.data?.emailSent).toBe(true)
       expect(prismaMock.user.create).toHaveBeenCalledWith({
         data: {
           email: 'family@example.com',
@@ -86,6 +87,39 @@ describe('Family Actions', () => {
           subject: expect.stringContaining('invited'),
         })
       )
+    })
+
+    it('should return emailSent: false when Resend throws (network error)', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null)
+      mockSend.mockRejectedValue(new Error('Resend outage'))
+
+      const result = await addFamilyMember({
+        email: 'family@example.com',
+        name: 'John Smith',
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.data?.emailSent).toBe(false)
+      // DB write should still have happened
+      expect(prismaMock.user.create).toHaveBeenCalled()
+    })
+
+    it('should return emailSent: false when Resend resolves with an API error', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null)
+      // The SDK does not throw on API errors — it resolves { data: null, error }
+      mockSend.mockResolvedValue({
+        data: null,
+        error: { message: 'Invalid `to` address', name: 'validation_error' },
+      })
+
+      const result = await addFamilyMember({
+        email: 'family@example.com',
+        name: 'John Smith',
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.data?.emailSent).toBe(false)
+      expect(prismaMock.user.create).toHaveBeenCalled()
     })
 
     it('should describe the link as non-expiring in the invite email', async () => {
@@ -259,7 +293,41 @@ describe('Family Actions', () => {
       const result = await resendFamilyInvite({ userId: 'user-1' })
 
       expect(result.success).toBe(true)
+      expect(result.data?.emailSent).toBe(true)
       expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({ to: 'jane@example.com' }))
+    })
+
+    it('should return emailSent: false when Resend throws (network error)', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        name: 'Jane',
+        email: 'jane@example.com',
+        isFamilyMember: true,
+      } as any)
+      mockSend.mockRejectedValue(new Error('Resend outage'))
+
+      const result = await resendFamilyInvite({ userId: 'user-1' })
+
+      expect(result.success).toBe(true)
+      expect(result.data?.emailSent).toBe(false)
+    })
+
+    it('should return emailSent: false when Resend resolves with an API error', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        name: 'Jane',
+        email: 'jane@example.com',
+        isFamilyMember: true,
+      } as any)
+      mockSend.mockResolvedValue({
+        data: null,
+        error: { message: 'Domain not verified', name: 'validation_error' },
+      })
+
+      const result = await resendFamilyInvite({ userId: 'user-1' })
+
+      expect(result.success).toBe(true)
+      expect(result.data?.emailSent).toBe(false)
     })
 
     it('should return error when user is not a family member', async () => {

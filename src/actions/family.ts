@@ -5,21 +5,9 @@ import { prisma } from '@/lib/prisma'
 import { secureAction } from '@/lib/auth/secure-action'
 import { signFamilyToken } from '@/lib/family-token'
 import { invalidateFamily } from '@/lib/cache/invalidation'
-import { Resend } from 'resend'
+import { getResend } from '@/lib/resend'
+import { escapeHtml } from '@/lib/security'
 import { env } from '@/lib/env'
-
-// Lazy-loaded to avoid module-scope crash on bad AUTH_RESEND_KEY and to enable test isolation
-const getResend = () => new Resend(env().AUTH_RESEND_KEY)
-
-// HTML-encode untrusted strings before interpolating into email HTML bodies
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-}
 
 // ---------------------------------------------------------------------------
 // Owner: add a family member (by email) and send booking invite
@@ -69,11 +57,15 @@ export const addFamilyMember = secureAction(
     const bookingUrl = `${appUrl}/book?family=${token}`
     const safeName = escapeHtml(data.name)
 
-    await getResend().emails.send({
-      from: env().RESEND_FROM_EMAIL,
-      to: data.email,
-      subject: "You're invited to book at Grizzly Getaway!",
-      html: `
+    // Resend resolves with { data, error } on API failures — it only throws on
+    // network-level errors, so both paths must mark the send as failed.
+    let emailSent = true
+    try {
+      const { error } = await getResend().emails.send({
+        from: env().RESEND_FROM_EMAIL,
+        to: data.email,
+        subject: "You're invited to book at Grizzly Getaway!",
+        html: `
         <h2>Family Booking Invitation</h2>
         <p>Hello ${safeName},</p>
         <p>You've been invited to book a stay at Grizzly Getaway as a family member.
@@ -84,10 +76,14 @@ export const addFamilyMember = secureAction(
         <p style="color:#666; font-size:12px;">This link stays valid as long as your family access is active. Contact the owner if you need a new one.</p>
         <p>Looking forward to hosting you!<br>Grizzly Getaway</p>
       `,
-    })
+      })
+      if (error) emailSent = false
+    } catch {
+      emailSent = false
+    }
 
     invalidateFamily()
-    return { success: true }
+    return { success: true, data: { emailSent } }
   }
 )
 
@@ -155,11 +151,15 @@ export const resendFamilyInvite = secureAction(
     const bookingUrl = `${appUrl}/book?family=${token}`
     const safeName = escapeHtml(user.name ?? 'there')
 
-    await getResend().emails.send({
-      from: env().RESEND_FROM_EMAIL,
-      to: user.email,
-      subject: 'Your Grizzly Getaway booking link',
-      html: `
+    // Same as addFamilyMember: Resend reports API failures via the resolved
+    // error field, not by throwing.
+    let emailSent = true
+    try {
+      const { error } = await getResend().emails.send({
+        from: env().RESEND_FROM_EMAIL,
+        to: user.email,
+        subject: 'Your Grizzly Getaway booking link',
+        html: `
         <h2>Here's your booking link!</h2>
         <p>Hello ${safeName},</p>
         <p>Use the link below to book your stay at Grizzly Getaway. As family, no payment is required!</p>
@@ -169,8 +169,12 @@ export const resendFamilyInvite = secureAction(
         <p style="color:#666; font-size:12px;">This link stays valid as long as your family access is active.</p>
         <p>See you soon!<br>Grizzly Getaway</p>
       `,
-    })
+      })
+      if (error) emailSent = false
+    } catch {
+      emailSent = false
+    }
 
-    return { success: true }
+    return { success: true, data: { emailSent } }
   }
 )
